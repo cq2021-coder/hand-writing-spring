@@ -13,6 +13,8 @@ public class Test {
     public static void main(String[] args) {
         CqApplicationContext context = new CqApplicationContext(AppConfig.class);
         UserInterface userService = (UserInterface) context.getBean("userService");
+        OrderService orderService = (OrderService) context.getBean("orderService");
         userService.test();
+        System.out.println(orderService);
     }
 }
