@@ -5,6 +5,8 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -23,6 +25,8 @@ public class CqApplicationContext {
 
     private final ConcurrentMap<String, Object> singletonObjects = new ConcurrentHashMap<>();
 
+    private final List<CqBeanPostProcessor> beanPostProcessorList = new ArrayList<>();
+
     /**
      * 单例
      */
@@ -31,9 +35,6 @@ public class CqApplicationContext {
      * 原型（多例）
      */
     private static final String PROTOTYPE = "prototype";
-
-    public CqApplicationContext() {
-    }
 
     public CqApplicationContext(Class<?> configClass) {
         this.configClass = configClass;
@@ -52,8 +53,8 @@ public class CqApplicationContext {
             //endregion
 
             File file = new File(Objects.requireNonNull(resource).getFile());
-            //是否为目录
 
+            //是否为目录
             if (file.isDirectory()) {
                 File[] files = file.listFiles();
                 assert files != null;
@@ -70,6 +71,12 @@ public class CqApplicationContext {
 
                             //判断是否为bean
                             if (clazz.isAnnotationPresent(CqComponent.class)) {
+
+                                //判断是否为当前这个类是否实现了CqBeanPostprocessor接口
+                                if (CqBeanPostProcessor.class.isAssignableFrom(clazz)) {
+                                    CqBeanPostProcessor instance = (CqBeanPostProcessor) clazz.getDeclaredConstructor().newInstance();
+                                    beanPostProcessorList.add(instance);
+                                }
 
                                 String beanName = clazz.getAnnotation(CqComponent.class).value();
 
@@ -88,7 +95,8 @@ public class CqApplicationContext {
                                 }
                                 beanDefinitionConcurrentMap.put(beanName, beanDefinition);
                             }
-                        } catch (ClassNotFoundException e) {
+                        } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException |
+                                 InstantiationException | IllegalAccessException e) {
                             throw new RuntimeException(e);
                         }
                     }
@@ -106,6 +114,7 @@ public class CqApplicationContext {
 
     private Object createBean(String beanName, CqBeanDefinition beanDefinition) {
         Class<?> clazz = beanDefinition.getType();
+
         try {
             Object instance = clazz.getConstructor().newInstance();
 
@@ -114,7 +123,7 @@ public class CqApplicationContext {
 
                 if (field.isAnnotationPresent(CqAutowired.class)) {
                     field.setAccessible(true);
-                    field.set(instance,getBean(field.getName()));
+                    field.set(instance, getBean(field.getName()));
                 }
             }
 
@@ -123,8 +132,26 @@ public class CqApplicationContext {
                 ((CqBeanNameAware) instance).setBeanName(beanName);
             }
 
+            //初始化前执行的方法
+            for (CqBeanPostProcessor beanPostProcessor : beanPostProcessorList) {
+                instance = beanPostProcessor.postProcessBeforeInitialization(beanName, instance);
+            }
+
+            //初始化机制，直接调用该实例的方法，框架本身不需要关心此方法逻辑
+            if (instance instanceof CqInitializingBean) {
+                ((CqInitializingBean) instance).afterPropertiesSet();
+            }
+
+            //初始化后执行的方法
+            for (CqBeanPostProcessor beanPostProcessor : beanPostProcessorList) {
+               instance = beanPostProcessor.postProcessAfterInitialization(beanName, instance);
+            }
+
+            //初始化后 AOP
+
             return instance;
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException |
+                 NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
     }

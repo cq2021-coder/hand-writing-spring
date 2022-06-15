@@ -1,9 +1,6 @@
 package com.cq.service;
 
-import com.cq.spring.CqAutowired;
-import com.cq.spring.CqBeanNameAware;
-import com.cq.spring.CqComponent;
-import com.cq.spring.CqScope;
+import com.cq.spring.*;
 
 /**
  * 用户服务
@@ -14,13 +11,14 @@ import com.cq.spring.CqScope;
  */
 @CqComponent("userService")
 @CqScope("singleton")
-public class UserService implements CqBeanNameAware {
+public class UserService implements CqBeanNameAware, CqInitializingBean,UserInterface {
 
     @CqAutowired
     private OrderService orderService;
 
     private String beanName;
 
+    @Override
     public void test() {
         System.out.println(orderService);
     }
@@ -32,5 +30,10 @@ public class UserService implements CqBeanNameAware {
 
     public String getBeanName() {
         return beanName;
+    }
+
+    @Override
+    public void afterPropertiesSet() {
+        System.out.println("初始化方法...");
     }
 }

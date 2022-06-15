@@ -12,8 +12,7 @@ import com.cq.spring.CqApplicationContext;
 public class Test {
     public static void main(String[] args) {
         CqApplicationContext context = new CqApplicationContext(AppConfig.class);
-        UserService userService = (UserService) context.getBean("userService");
+        UserInterface userService = (UserInterface) context.getBean("userService");
         userService.test();
-        System.out.println(userService.getBeanName());
     }
 }
